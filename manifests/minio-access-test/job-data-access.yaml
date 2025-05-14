@@ -1,0 +1,21 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: test-minio-access-data
+  namespace: app
+spec:
+  template:
+    metadata:
+      name: test-minio-access-data
+    spec:
+      serviceAccountName: data-service-sa
+      restartPolicy: Never
+      containers:
+      - name: mc
+        image: minio/mc
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            mc alias set local http://minio.system.svc.cluster.local:9000 minioadmin minioadmin123;
+            mc mb local/test-bucket;
+            mc ls local;
