@@ -11,10 +11,17 @@ spec:
   - host: gateway.local
     http:
       paths:
-      - path: /
+      - path: /data
         pathType: Prefix
         backend:
           service:
-            name: gateway
+            name: data-service
+            port:
+              number: 5678
+      - path: /auth
+        pathType: Prefix
+        backend:
+          service:
+            name: auth-service
             port:
               number: 80
