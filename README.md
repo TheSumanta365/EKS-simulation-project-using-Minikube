@@ -10,8 +10,9 @@ This project demonstrates a production-style deployment of containerized microse
 
 * Minikube
 * kubectl
-* helm (for Prometheus stack)
+* helm
 * docker
+* prometheus and grafana(setup by helm)
 
 ### Quick Start
 
@@ -20,17 +21,77 @@ This project demonstrates a production-style deployment of containerized microse
 minikube start --addons=metrics-server,ingress
 
 # Apply Kubernetes manifests
-kubectl apply -k k8s-manifests/
+kubectl apply -k manifests/app-services/auth-service
+
+kubectl apply -k manifests/app-services/data-service
+
+kubectl apply -k manifests/app-services/gateway
 
 # Deploy Prometheus + Grafana
 kubectl apply -f observability/prometheus-stack/
 kubectl apply -f observability/grafana-dashboards/
 
-# (Optional) Access Grafana
+# Access Grafana UI
 kubectl port-forward svc/kube-prom-stack-grafana 3000:80 -n default
-```
 
+# Fetch the ip and put in hosts file
+minikube ip
+sudo nano /etc/hosts
+<minikube-ip>   gateway.local #add in the last line
+# Activate minikube tunnel
+ minikube tunnel
+# Access the Application
+#go to the browser and access the entry point by typing
+gateway.local #shows the nginx hello page
+gateway.local/auth #shows the httpbin.org page
+gateway.local/data #shows "hello from data service"
+```
 ---
+## 🧭 Architecture Diagram
+
+                                 +---------------------------+
+                                 |       External User       |
+                                 +------------+--------------+
+                                              |
+                                              v
+                                 +------------+--------------+
+                                 |       Ingress (NGINX)     |  <- gateway.local
+                                 |    (gateway-ingress)      |
+                                 +------+------+-------------+
+                                        |      |
+                     ------------------+      +-------------------
+                    |                                        |
+                    v                                        v
+         +---------------------+                +----------------------+
+         |   gateway service   |                |  /data -> data-service |
+         | ClusterIP:80        |                | ClusterIP:5678        |
+         +----------+----------+                +----------+-----------+
+                    |                                     |
+                    v                                     v
+         +------------------------+         +---------------------------+
+         |  gateway pod (80)      |         |   data-service pod (5678) |
+         +------------------------+         +---------------------------+
+
+                                  |
+                                  +-----------------------------------+
+                                  |                                   |
+                                  v                                   v
+                 +-----------------------------+      +-----------------------------+
+                 | /auth -> auth-service       |      |  Minio (internal)           |
+                 | ClusterIP:80                |      | Access tested by test pods  |
+                 +-------------+---------------+      +-----------------------------+
+                               |
+                               v
+              +-------------------------------+
+              |   auth-service pod (80)       |
+              +-------------------------------+
+
+Notes:
+- All services run in the `app` namespace.
+- Ingress is handled by NGINX, routing `/`, `/auth`, and `/data` based on the path.
+- NetworkPolicies isolate services, restricting unauthorized cross-communication.
+- Minio is tested internally with job/test pods.
+
 
 ## 🛡️ Key Features
 
@@ -93,20 +154,4 @@ kubectl port-forward svc/kube-prom-stack-grafana 3000:80 -n default
 * Not integrated with full CI/CD in this setup
 
 ---
-
-## ✅ Evaluation Coverage
-
-| Area                | Status |
-| ------------------- | ------ |
-| Namespaces & RBAC   | ✅      |
-| Network Policies    | ✅      |
-| Ingress & Services  | ✅      |
-| Monitoring Setup    | ✅      |
-| Failure Simulation  | ✅      |
-| Security Fixes      | ✅      |
-| Kyverno Policy      | ✅      |
-| Clear Documentation | ✅      |
-
----
-
 
